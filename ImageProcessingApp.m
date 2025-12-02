@@ -299,7 +299,7 @@ classdef ImageProcessingApp < matlab.apps.AppBase
                     app.RT_Camera = webcam;
                     app.RT_IsRunning = true;
                     app.RT_StartStopBtn.Text = 'Stop';
-                    app.RT_StartStopBtn.BackgroundColor = [0.85 0.33 0.10];
+                    app.RT_StartStopBtn.BackgroundColor = [0.8 0.3 0.2]; % Red for stop
                     
                     % Start video loop
                     while app.RT_IsRunning && isvalid(app.UIFigure)
@@ -343,7 +343,7 @@ classdef ImageProcessingApp < matlab.apps.AppBase
                 % Stop real-time processing
                 app.RT_IsRunning = false;
                 app.RT_StartStopBtn.Text = 'Start';
-                app.RT_StartStopBtn.BackgroundColor = [0.65 0.65 0.65];
+                app.RT_StartStopBtn.BackgroundColor = [0.2 0.6 0.4]; % Green for start
                 
                 if ~isempty(app.RT_Camera)
                     clear app.RT_Camera;
@@ -537,32 +537,59 @@ classdef ImageProcessingApp < matlab.apps.AppBase
             % Filter out temp files
             imageFiles = imageFiles(~contains({imageFiles.name}, 'temp_'));
             
-            % Limit to 6 most recent files
-            if length(imageFiles) > 6
-                [~, idx] = sort([imageFiles.datenum], 'descend');
-                imageFiles = imageFiles(idx(1:6));
-            end
+            % Sort by date (newest first)
+            [~, idx] = sort([imageFiles.datenum], 'descend');
+            imageFiles = imageFiles(idx);
             
             switch tabName
                 case 'StyleTransfer'
-                    buttons = app.ST_ImageButtons;
+                    panel = app.ST_SidebarPanel;
                 case 'RealTime'
-                    buttons = app.RT_ImageButtons;
+                    panel = app.RT_SidebarPanel;
                 case 'ImageGenerator'
-                    buttons = app.IG_ImageButtons;
+                    panel = app.IG_SidebarPanel;
             end
             
-            % Update buttons
-            for i = 1:6
-                if i <= length(imageFiles)
-                    buttons{i}.Text = imageFiles(i).name;
-                    buttons{i}.Enable = 'on';
-                    buttons{i}.UserData = imageFiles(i).name;
-                else
-                    buttons{i}.Text = sprintf('Image %d', i);
-                    buttons{i}.Enable = 'off';
-                    buttons{i}.UserData = '';
-                end
+            % Clear existing children
+            delete(panel.Children);
+            
+            % Create GridLayout for scrolling list
+            numImages = length(imageFiles);
+            g = uigridlayout(panel);
+            g.ColumnWidth = {'1x'};
+            if numImages > 0
+                g.RowHeight = repmat({45}, 1, numImages);
+            else
+                g.RowHeight = {'1x'};
+            end
+            g.Scrollable = 'on';
+            g.Padding = [5 5 5 5];
+            g.RowSpacing = 5;
+            g.BackgroundColor = panel.BackgroundColor;
+            
+            buttons = cell(numImages, 1);
+            
+            % Create buttons dynamically
+            for i = 1:numImages
+                btn = uibutton(g, 'push');
+                btn.Text = imageFiles(i).name;
+                btn.BackgroundColor = [0.25 0.3 0.35];
+                btn.FontColor = [1 1 1];
+                btn.FontSize = 10;
+                btn.UserData = imageFiles(i).name;
+                btn.ButtonPushedFcn = @(btn,~) loadSidebarImage(app, btn, tabName);
+                btn.Tooltip = imageFiles(i).name;
+                buttons{i} = btn;
+            end
+            
+            % Store button references
+            switch tabName
+                case 'StyleTransfer'
+                    app.ST_ImageButtons = buttons;
+                case 'RealTime'
+                    app.RT_ImageButtons = buttons;
+                case 'ImageGenerator'
+                    app.IG_ImageButtons = buttons;
             end
         end
         
@@ -604,234 +631,236 @@ classdef ImageProcessingApp < matlab.apps.AppBase
             app.UIFigure.Position = [100 100 1000 650];
             app.UIFigure.Name = 'Image Processing Application';
             app.UIFigure.Resize = 'on';
-            app.UIFigure.Color = [0.94 0.94 0.94];
+            app.UIFigure.Color = [0.95 0.96 0.98]; % Modern Light Blue-Grey Background
             
+            % Main Title
+            mainTitle = uilabel(app.UIFigure);
+            mainTitle.Text = 'IMAGE PROCESSING APP';
+            mainTitle.Position = [0 600 1000 40];
+            mainTitle.FontSize = 28;
+            mainTitle.FontWeight = 'bold';
+            mainTitle.FontColor = [0.15 0.2 0.25];
+            mainTitle.HorizontalAlignment = 'center';
+
             % Create TabGroup
             app.TabGroup = uitabgroup(app.UIFigure);
-            app.TabGroup.Position = [10 10 980 630];
+            app.TabGroup.Position = [10 10 980 580]; % Adjusted for title
             
             %% Create Style Transfer Tab
             app.StyleTransferTab = uitab(app.TabGroup);
             app.StyleTransferTab.Title = 'Style Transfer';
-            app.StyleTransferTab.BackgroundColor = [1 1 1];
+            app.StyleTransferTab.BackgroundColor = [0.98 0.98 0.98];
             
             % Title
             titleLabel = uilabel(app.StyleTransferTab);
             titleLabel.Text = 'Style Transfer';
-            titleLabel.Position = [190 540 600 40];
+            titleLabel.Position = [190 490 600 40]; % Adjusted Y
             titleLabel.FontSize = 24;
             titleLabel.FontWeight = 'bold';
+            titleLabel.FontColor = [0.25 0.5 0.75];
             titleLabel.HorizontalAlignment = 'center';
             
             % Sidebar
             app.ST_SidebarPanel = uipanel(app.StyleTransferTab);
-            app.ST_SidebarPanel.Position = [10 10 150 570];
-            app.ST_SidebarPanel.BackgroundColor = [0.75 0.75 0.75];
+            app.ST_SidebarPanel.Position = [10 10 150 530]; % Adjusted height
+            app.ST_SidebarPanel.BackgroundColor = [0.17 0.24 0.31]; % Dark Sidebar
             app.ST_SidebarPanel.BorderType = 'none';
             
             sidebarLabel = uilabel(app.ST_SidebarPanel);
-            sidebarLabel.Position = [5 540 140 25];
+            sidebarLabel.Position = [5 500 140 25];
             sidebarLabel.Text = 'Images From Directory';
-            sidebarLabel.FontSize = 9;
+            sidebarLabel.FontSize = 10;
             sidebarLabel.FontWeight = 'bold';
+            sidebarLabel.FontColor = [0.9 0.9 0.9];
             sidebarLabel.HorizontalAlignment = 'center';
             sidebarLabel.WordWrap = 'on';
             
-            % Create 6 image buttons
-            app.ST_ImageButtons = cell(6, 1);
-            for i = 1:6
-                app.ST_ImageButtons{i} = uibutton(app.ST_SidebarPanel, 'push');
-                app.ST_ImageButtons{i}.Position = [10 480-(i-1)*60 130 45];
-                app.ST_ImageButtons{i}.Text = sprintf('Image %d', i);
-                app.ST_ImageButtons{i}.Enable = 'off';
-                app.ST_ImageButtons{i}.BackgroundColor = [0.65 0.65 0.65];
-                app.ST_ImageButtons{i}.FontSize = 9;
-                app.ST_ImageButtons{i}.ButtonPushedFcn = @(btn,~) loadSidebarImage(app, btn, 'StyleTransfer');
-            end
+            % Initialize empty button array
+            app.ST_ImageButtons = cell(0, 1);
             
             % Image axes
             app.ST_TargetImageAxes = uiaxes(app.StyleTransferTab);
-            app.ST_TargetImageAxes.Position = [180 230 220 290];
+            app.ST_TargetImageAxes.Position = [180 200 220 270];
             app.ST_TargetImageAxes.XTick = [];
             app.ST_TargetImageAxes.YTick = [];
             app.ST_TargetImageAxes.Box = 'on';
-            app.ST_TargetImageAxes.Color = [0.75 0.75 0.75];
-            title(app.ST_TargetImageAxes, 'Target Image', 'FontSize', 11);
+            app.ST_TargetImageAxes.Color = [0.9 0.9 0.95];
+            title(app.ST_TargetImageAxes, 'Target Image', 'FontSize', 11, 'Color', [0.2 0.2 0.2]);
             
             app.ST_ContentImageAxes = uiaxes(app.StyleTransferTab);
-            app.ST_ContentImageAxes.Position = [420 230 220 290];
+            app.ST_ContentImageAxes.Position = [420 200 220 270];
             app.ST_ContentImageAxes.XTick = [];
             app.ST_ContentImageAxes.YTick = [];
             app.ST_ContentImageAxes.Box = 'on';
-            app.ST_ContentImageAxes.Color = [0.75 0.75 0.75];
-            title(app.ST_ContentImageAxes, 'Content Image', 'FontSize', 11);
+            app.ST_ContentImageAxes.Color = [0.9 0.9 0.95];
+            title(app.ST_ContentImageAxes, 'Content Image', 'FontSize', 11, 'Color', [0.2 0.2 0.2]);
             
             app.ST_OutputAxes = uiaxes(app.StyleTransferTab);
-            app.ST_OutputAxes.Position = [660 230 220 290];
+            app.ST_OutputAxes.Position = [660 200 220 270];
             app.ST_OutputAxes.XTick = [];
             app.ST_OutputAxes.YTick = [];
             app.ST_OutputAxes.Box = 'on';
-            app.ST_OutputAxes.Color = [0.75 0.75 0.75];
-            title(app.ST_OutputAxes, 'Output', 'FontSize', 11);
+            app.ST_OutputAxes.Color = [0.9 0.9 0.95];
+            title(app.ST_OutputAxes, 'Output', 'FontSize', 11, 'Color', [0.2 0.2 0.2]);
             
             % Buttons
             app.ST_ChooseTargetBtn = uibutton(app.StyleTransferTab, 'push');
-            app.ST_ChooseTargetBtn.Position = [195 160 190 45];
+            app.ST_ChooseTargetBtn.Position = [195 130 190 45];
             app.ST_ChooseTargetBtn.Text = 'Choose Target';
             app.ST_ChooseTargetBtn.FontSize = 11;
-            app.ST_ChooseTargetBtn.BackgroundColor = [0.65 0.65 0.65];
+            app.ST_ChooseTargetBtn.FontWeight = 'bold';
+            app.ST_ChooseTargetBtn.BackgroundColor = [0.25 0.5 0.75];
+            app.ST_ChooseTargetBtn.FontColor = [1 1 1];
             app.ST_ChooseTargetBtn.ButtonPushedFcn = @(~,~) app.ST_ChooseTargetImage();
             
             app.ST_ChooseContentBtn = uibutton(app.StyleTransferTab, 'push');
-            app.ST_ChooseContentBtn.Position = [435 160 190 45];
+            app.ST_ChooseContentBtn.Position = [435 130 190 45];
             app.ST_ChooseContentBtn.Text = 'Choose Content';
             app.ST_ChooseContentBtn.FontSize = 11;
-            app.ST_ChooseContentBtn.BackgroundColor = [0.65 0.65 0.65];
+            app.ST_ChooseContentBtn.FontWeight = 'bold';
+            app.ST_ChooseContentBtn.BackgroundColor = [0.25 0.5 0.75];
+            app.ST_ChooseContentBtn.FontColor = [1 1 1];
             app.ST_ChooseContentBtn.ButtonPushedFcn = @(~,~) app.ST_ChooseContentImage();
             
             app.ST_SaveOutputBtn = uibutton(app.StyleTransferTab, 'push');
-            app.ST_SaveOutputBtn.Position = [675 160 190 45];
+            app.ST_SaveOutputBtn.Position = [675 130 190 45];
             app.ST_SaveOutputBtn.Text = 'Save Output';
             app.ST_SaveOutputBtn.FontSize = 11;
-            app.ST_SaveOutputBtn.BackgroundColor = [0.65 0.65 0.65];
+            app.ST_SaveOutputBtn.FontWeight = 'bold';
+            app.ST_SaveOutputBtn.BackgroundColor = [0.25 0.5 0.75];
+            app.ST_SaveOutputBtn.FontColor = [1 1 1];
             app.ST_SaveOutputBtn.Enable = 'off';
             app.ST_SaveOutputBtn.ButtonPushedFcn = @(~,~) app.ST_SaveOutput();
             
             app.ST_ClearAllBtn = uibutton(app.StyleTransferTab, 'push');
-            app.ST_ClearAllBtn.Position = [400 80 200 45];
+            app.ST_ClearAllBtn.Position = [400 50 200 45];
             app.ST_ClearAllBtn.Text = 'Clear All';
             app.ST_ClearAllBtn.FontSize = 11;
-            app.ST_ClearAllBtn.BackgroundColor = [0.65 0.65 0.65];
+            app.ST_ClearAllBtn.FontWeight = 'bold';
+            app.ST_ClearAllBtn.BackgroundColor = [0.8 0.3 0.3]; % Reddish for clear
+            app.ST_ClearAllBtn.FontColor = [1 1 1];
             app.ST_ClearAllBtn.ButtonPushedFcn = @(~,~) app.ST_ClearAll();
             
             %% Create Real-Time Style Transfer Tab
             app.RTTab = uitab(app.TabGroup);
             app.RTTab.Title = 'Real Time Style Transfer';
-            app.RTTab.BackgroundColor = [1 1 1];
+            app.RTTab.BackgroundColor = [0.98 0.98 0.98];
             
             % Title
             rtTitleLabel = uilabel(app.RTTab);
             rtTitleLabel.Text = 'Real Time Style Transfer';
-            rtTitleLabel.Position = [190 540 600 40];
+            rtTitleLabel.Position = [190 490 600 40];
             rtTitleLabel.FontSize = 24;
             rtTitleLabel.FontWeight = 'bold';
+            rtTitleLabel.FontColor = [0.25 0.5 0.75];
             rtTitleLabel.HorizontalAlignment = 'center';
             
             % Sidebar
             app.RT_SidebarPanel = uipanel(app.RTTab);
-            app.RT_SidebarPanel.Position = [10 10 150 570];
-            app.RT_SidebarPanel.BackgroundColor = [0.75 0.75 0.75];
+            app.RT_SidebarPanel.Position = [10 10 150 530];
+            app.RT_SidebarPanel.BackgroundColor = [0.17 0.24 0.31];
             app.RT_SidebarPanel.BorderType = 'none';
             
             rtSidebarLabel = uilabel(app.RT_SidebarPanel);
-            rtSidebarLabel.Position = [5 540 140 25];
+            rtSidebarLabel.Position = [5 500 140 25];
             rtSidebarLabel.Text = 'Images From Directory';
-            rtSidebarLabel.FontSize = 9;
+            rtSidebarLabel.FontSize = 10;
             rtSidebarLabel.FontWeight = 'bold';
+            rtSidebarLabel.FontColor = [0.9 0.9 0.9];
             rtSidebarLabel.HorizontalAlignment = 'center';
             rtSidebarLabel.WordWrap = 'on';
             
-            % Create 6 image buttons
-            app.RT_ImageButtons = cell(6, 1);
-            for i = 1:6
-                app.RT_ImageButtons{i} = uibutton(app.RT_SidebarPanel, 'push');
-                app.RT_ImageButtons{i}.Position = [10 480-(i-1)*60 130 45];
-                app.RT_ImageButtons{i}.Text = sprintf('Image %d', i);
-                app.RT_ImageButtons{i}.Enable = 'off';
-                app.RT_ImageButtons{i}.BackgroundColor = [0.65 0.65 0.65];
-                app.RT_ImageButtons{i}.FontSize = 9;
-            end
+            % Initialize empty button array
+            app.RT_ImageButtons = cell(0, 1);
             
             % Image axes
             app.RT_TargetImageAxes = uiaxes(app.RTTab);
-            app.RT_TargetImageAxes.Position = [180 230 200 290];
+            app.RT_TargetImageAxes.Position = [180 200 200 270];
             app.RT_TargetImageAxes.XTick = [];
             app.RT_TargetImageAxes.YTick = [];
             app.RT_TargetImageAxes.Box = 'on';
-            app.RT_TargetImageAxes.Color = [0.75 0.75 0.75];
-            title(app.RT_TargetImageAxes, 'Target Image', 'FontSize', 11);
+            app.RT_TargetImageAxes.Color = [0.9 0.9 0.95];
+            title(app.RT_TargetImageAxes, 'Target Image', 'FontSize', 11, 'Color', [0.2 0.2 0.2]);
             
             app.RT_VideoAxes = uiaxes(app.RTTab);
-            app.RT_VideoAxes.Position = [400 230 240 290];
+            app.RT_VideoAxes.Position = [400 200 240 270];
             app.RT_VideoAxes.XTick = [];
             app.RT_VideoAxes.YTick = [];
             app.RT_VideoAxes.Box = 'on';
-            app.RT_VideoAxes.Color = [0.75 0.75 0.75];
-            title(app.RT_VideoAxes, 'Webcam Input', 'FontSize', 11);
+            app.RT_VideoAxes.Color = [0.9 0.9 0.95];
+            title(app.RT_VideoAxes, 'Webcam Input', 'FontSize', 11, 'Color', [0.2 0.2 0.2]);
             
             app.RT_OutputAxes = uiaxes(app.RTTab);
-            app.RT_OutputAxes.Position = [660 230 240 290];
+            app.RT_OutputAxes.Position = [660 200 240 270];
             app.RT_OutputAxes.XTick = [];
             app.RT_OutputAxes.YTick = [];
             app.RT_OutputAxes.Box = 'on';
-            app.RT_OutputAxes.Color = [0.75 0.75 0.75];
-            title(app.RT_OutputAxes, 'Styled Output', 'FontSize', 11);
+            app.RT_OutputAxes.Color = [0.9 0.9 0.95];
+            title(app.RT_OutputAxes, 'Styled Output', 'FontSize', 11, 'Color', [0.2 0.2 0.2]);
             
             % Buttons
             app.RT_ChooseTargetBtn = uibutton(app.RTTab, 'push');
-            app.RT_ChooseTargetBtn.Position = [210 140 150 45];
+            app.RT_ChooseTargetBtn.Position = [210 120 150 45];
             app.RT_ChooseTargetBtn.Text = 'Choose Target';
             app.RT_ChooseTargetBtn.FontSize = 11;
-            app.RT_ChooseTargetBtn.BackgroundColor = [0.65 0.65 0.65];
+            app.RT_ChooseTargetBtn.FontWeight = 'bold';
+            app.RT_ChooseTargetBtn.BackgroundColor = [0.25 0.5 0.75];
+            app.RT_ChooseTargetBtn.FontColor = [1 1 1];
             app.RT_ChooseTargetBtn.ButtonPushedFcn = @(~,~) app.RT_ChooseTargetImage();
             
             app.RT_StartStopBtn = uibutton(app.RTTab, 'push');
-            app.RT_StartStopBtn.Position = [450 70 160 50];
+            app.RT_StartStopBtn.Position = [450 50 160 50];
             app.RT_StartStopBtn.Text = 'Start';
-            app.RT_StartStopBtn.FontSize = 13;
+            app.RT_StartStopBtn.FontSize = 14;
             app.RT_StartStopBtn.FontWeight = 'bold';
-            app.RT_StartStopBtn.BackgroundColor = [0.65 0.65 0.65];
+            app.RT_StartStopBtn.BackgroundColor = [0.2 0.6 0.4]; % Green for start
+            app.RT_StartStopBtn.FontColor = [1 1 1];
             app.RT_StartStopBtn.ButtonPushedFcn = @(~,~) app.RT_StartStop();
             
             %% Create Image Generator Tab
             app.IGTab = uitab(app.TabGroup);
             app.IGTab.Title = 'Image Generator';
-            app.IGTab.BackgroundColor = [1 1 1];
+            app.IGTab.BackgroundColor = [0.98 0.98 0.98];
             
             % Title
             igTitleLabel = uilabel(app.IGTab);
             igTitleLabel.Text = 'Image Generator';
-            igTitleLabel.Position = [190 540 600 40];
+            igTitleLabel.Position = [190 490 600 40];
             igTitleLabel.FontSize = 24;
             igTitleLabel.FontWeight = 'bold';
+            igTitleLabel.FontColor = [0.25 0.5 0.75];
             igTitleLabel.HorizontalAlignment = 'center';
             
             % Sidebar
             app.IG_SidebarPanel = uipanel(app.IGTab);
-            app.IG_SidebarPanel.Position = [10 10 150 570];
-            app.IG_SidebarPanel.BackgroundColor = [0.75 0.75 0.75];
+            app.IG_SidebarPanel.Position = [10 10 150 530];
+            app.IG_SidebarPanel.BackgroundColor = [0.17 0.24 0.31];
             app.IG_SidebarPanel.BorderType = 'none';
             
             igSidebarLabel = uilabel(app.IG_SidebarPanel);
-            igSidebarLabel.Position = [5 540 140 25];
+            igSidebarLabel.Position = [5 500 140 25];
             igSidebarLabel.Text = 'Images From Directory';
-            igSidebarLabel.FontSize = 9;
+            igSidebarLabel.FontSize = 10;
             igSidebarLabel.FontWeight = 'bold';
+            igSidebarLabel.FontColor = [0.9 0.9 0.9];
             igSidebarLabel.HorizontalAlignment = 'center';
             igSidebarLabel.WordWrap = 'on';
             
-            % Create 6 image buttons
-            app.IG_ImageButtons = cell(6, 1);
-            for i = 1:6
-                app.IG_ImageButtons{i} = uibutton(app.IG_SidebarPanel, 'push');
-                app.IG_ImageButtons{i}.Position = [10 480-(i-1)*60 130 45];
-                app.IG_ImageButtons{i}.Text = sprintf('Image %d', i);
-                app.IG_ImageButtons{i}.Enable = 'off';
-                app.IG_ImageButtons{i}.BackgroundColor = [0.65 0.65 0.65];
-                app.IG_ImageButtons{i}.FontSize = 9;
-                app.IG_ImageButtons{i}.ButtonPushedFcn = @(btn,~) loadSidebarImage(app, btn, 'ImageGenerator');
-            end
+            % Initialize empty button array
+            app.IG_ImageButtons = cell(0, 1);
             
             % Parameters panel
             app.IG_ParametersPanel = uipanel(app.IGTab);
-            app.IG_ParametersPanel.Title = 'Parametreler';
-            app.IG_ParametersPanel.Position = [720 420 230 130];
+            app.IG_ParametersPanel.Title = 'Parameters';
+            app.IG_ParametersPanel.Position = [720 380 230 130]; % Adjusted Y
             app.IG_ParametersPanel.FontWeight = 'bold';
-            app.IG_ParametersPanel.BackgroundColor = [0.9 0.9 0.9];
+            app.IG_ParametersPanel.BackgroundColor = [0.9 0.9 0.95];
+            app.IG_ParametersPanel.TitlePosition = 'centertop';
             
             app.IG_StepsLabel = uilabel(app.IG_ParametersPanel);
             app.IG_StepsLabel.Position = [10 70 70 22];
             app.IG_StepsLabel.Text = 'Steps:';
+            app.IG_StepsLabel.FontWeight = 'bold';
             
             app.IG_StepsSpinner = uispinner(app.IG_ParametersPanel);
             app.IG_StepsSpinner.Position = [90 70 120 22];
@@ -842,6 +871,7 @@ classdef ImageProcessingApp < matlab.apps.AppBase
             app.IG_GuidanceLabel = uilabel(app.IG_ParametersPanel);
             app.IG_GuidanceLabel.Position = [10 35 70 22];
             app.IG_GuidanceLabel.Text = 'Guidance:';
+            app.IG_GuidanceLabel.FontWeight = 'bold';
             
             app.IG_GuidanceSpinner = uispinner(app.IG_ParametersPanel);
             app.IG_GuidanceSpinner.Position = [90 35 120 22];
@@ -851,67 +881,72 @@ classdef ImageProcessingApp < matlab.apps.AppBase
             
             % Main display area with placeholder
             app.IG_ImageAxes = uiaxes(app.IGTab);
-            app.IG_ImageAxes.Position = [180 190 510 350];
+            app.IG_ImageAxes.Position = [180 180 510 290];
             app.IG_ImageAxes.XTick = [];
             app.IG_ImageAxes.YTick = [];
             app.IG_ImageAxes.Box = 'on';
-            app.IG_ImageAxes.Color = [0.75 0.75 0.75];
+            app.IG_ImageAxes.Color = [0.9 0.9 0.95];
             
             app.IG_PlaceholderLabel = uilabel(app.IGTab);
-            app.IG_PlaceholderLabel.Position = [180 190 510 350];
+            app.IG_PlaceholderLabel.Position = [180 180 510 290];
             app.IG_PlaceholderLabel.Text = {'Image Show'; 'Here'};
             app.IG_PlaceholderLabel.FontSize = 28;
             app.IG_PlaceholderLabel.FontWeight = 'bold';
-            app.IG_PlaceholderLabel.FontColor = [0.4 0.4 0.4];
+            app.IG_PlaceholderLabel.FontColor = [0.6 0.6 0.65];
             app.IG_PlaceholderLabel.HorizontalAlignment = 'center';
             app.IG_PlaceholderLabel.VerticalAlignment = 'center';
             
-            % Prompt section
-            app.IG_PromptLabel = uilabel(app.IGTab);
-            app.IG_PromptLabel.Position = [180 155 80 22];
-            app.IG_PromptLabel.Text = 'Prompt';
-            app.IG_PromptLabel.FontWeight = 'bold';
-            
-            app.IG_PromptTextArea = uitextarea(app.IGTab);
-            app.IG_PromptTextArea.Position = [180 60 510 90];
-            app.IG_PromptTextArea.Value = {''};
-            
-            % Buttons
-            app.IG_GenerateButton = uibutton(app.IGTab, 'push');
-            app.IG_GenerateButton.Position = [720 310 110 50];
-            app.IG_GenerateButton.Text = 'Oluştur';
-            app.IG_GenerateButton.FontSize = 12;
-            app.IG_GenerateButton.FontWeight = 'bold';
-            app.IG_GenerateButton.BackgroundColor = [0.65 0.65 0.65];
-            app.IG_GenerateButton.ButtonPushedFcn = @(~,~) app.IG_Generate();
-            
-            app.IG_SaveButton = uibutton(app.IGTab, 'push');
-            app.IG_SaveButton.Position = [840 310 110 50];
-            app.IG_SaveButton.Text = 'Kaydet';
-            app.IG_SaveButton.FontSize = 12;
-            app.IG_SaveButton.FontWeight = 'bold';
-            app.IG_SaveButton.BackgroundColor = [0.65 0.65 0.65];
-            app.IG_SaveButton.Enable = 'off';
-            app.IG_SaveButton.ButtonPushedFcn = @(~,~) app.IG_Save();
-            
-            app.IG_ClearButton = uibutton(app.IGTab, 'push');
-            app.IG_ClearButton.Position = [720 240 230 50];
-            app.IG_ClearButton.Text = 'Temizle';
-            app.IG_ClearButton.FontSize = 12;
-            app.IG_ClearButton.FontWeight = 'bold';
-            app.IG_ClearButton.BackgroundColor = [0.65 0.65 0.65];
-            app.IG_ClearButton.ButtonPushedFcn = @(~,~) app.IG_Clear();
-            
             % Progress section
             app.IG_ProgressLabel = uilabel(app.IGTab);
-            app.IG_ProgressLabel.Position = [180 30 120 22];
+            app.IG_ProgressLabel.Position = [180 150 120 22];
             app.IG_ProgressLabel.Text = 'Progress Bar';
             app.IG_ProgressLabel.FontWeight = 'bold';
             
             app.IG_ProgressGauge = uigauge(app.IGTab, 'linear');
-            app.IG_ProgressGauge.Position = [180 10 510 20];
+            app.IG_ProgressGauge.Position = [180 110 510 35];
             app.IG_ProgressGauge.Limits = [0 100];
             app.IG_ProgressGauge.Value = 0;
+            
+            % Prompt section
+            app.IG_PromptLabel = uilabel(app.IGTab);
+            app.IG_PromptLabel.Position = [180 80 80 22];
+            app.IG_PromptLabel.Text = 'Prompt';
+            app.IG_PromptLabel.FontWeight = 'bold';
+            app.IG_PromptLabel.FontColor = [0.2 0.2 0.2];
+            
+            app.IG_PromptTextArea = uitextarea(app.IGTab);
+            app.IG_PromptTextArea.Position = [180 15 510 60];
+            app.IG_PromptTextArea.Value = {''};
+            app.IG_PromptTextArea.FontSize = 12;
+            
+            % Buttons
+            app.IG_GenerateButton = uibutton(app.IGTab, 'push');
+            app.IG_GenerateButton.Position = [720 280 110 50];
+            app.IG_GenerateButton.Text = 'Generate';
+            app.IG_GenerateButton.FontSize = 12;
+            app.IG_GenerateButton.FontWeight = 'bold';
+            app.IG_GenerateButton.BackgroundColor = [0.25 0.5 0.75];
+            app.IG_GenerateButton.FontColor = [1 1 1];
+            app.IG_GenerateButton.ButtonPushedFcn = @(~,~) app.IG_Generate();
+            
+            app.IG_SaveButton = uibutton(app.IGTab, 'push');
+            app.IG_SaveButton.Position = [840 280 110 50];
+            app.IG_SaveButton.Text = 'Save';
+            app.IG_SaveButton.FontSize = 12;
+            app.IG_SaveButton.FontWeight = 'bold';
+            app.IG_SaveButton.BackgroundColor = [0.25 0.5 0.75];
+            app.IG_SaveButton.FontColor = [1 1 1];
+            app.IG_SaveButton.Enable = 'off';
+            app.IG_SaveButton.ButtonPushedFcn = @(~,~) app.IG_Save();
+            
+            app.IG_ClearButton = uibutton(app.IGTab, 'push');
+            app.IG_ClearButton.Position = [720 210 230 50];
+            app.IG_ClearButton.Text = 'Clear';
+            app.IG_ClearButton.FontSize = 12;
+            app.IG_ClearButton.FontWeight = 'bold';
+            app.IG_ClearButton.BackgroundColor = [0.8 0.3 0.3];
+            app.IG_ClearButton.FontColor = [1 1 1];
+            app.IG_ClearButton.ButtonPushedFcn = @(~,~) app.IG_Clear();
             
             % Make figure visible
             app.UIFigure.Visible = 'on';
